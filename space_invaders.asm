@@ -92,7 +92,7 @@ _wait_next_frame_loop:
 leave	s0
 
 # --------------------------------------------------------------------------------------------------
-
+# git hub test
 # .....and here's where all the rest of your code goes :D
 
 check_input: #if  function 	
@@ -262,6 +262,7 @@ _check_input_bullet_exit:
 
 draw_bullets: #function
 	push ra
+	
 	bge v0, MAX_BULLETS, _exit_draw_bullets #no bullets to draw
 	#only active 
 	lbu a0, bullet_x
@@ -288,10 +289,10 @@ move_bullets:
 	beq t1, 0, _inc
 
 	_loop_move_bullets1: 
-	lb t3, bullet_y(v0)
+	lb t3, bullet_y(s0)
 	sub t3, t3, 1
-	sb t3, bullet_y(v0)
 	blt t3, 0, _make_into_zero
+	sb t3, bullet_y(s0)
 
 	_inc:
 	inc s0
@@ -303,7 +304,7 @@ move_bullets:
 	# here, the bullet has gone off the screen
 	# so, do something??
 	_make_into_zero:
-	sb zero, bullet_active(v0) #store zero
+	sb zero, bullet_active(s0) #store zero
 	b _inc
 
 
