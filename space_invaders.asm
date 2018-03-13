@@ -263,7 +263,7 @@ _check_input_bullet_exit:
 draw_bullets: #function
 	push ra
 	
-	bge v0, MAX_BULLETS, _exit_draw_bullets #no bullets to draw
+	#bge v0, MAX_BULLETS, _exit_draw_bullets #no bullets to draw
 	#only active 
 	lbu a0, bullet_x
 	lbu a1, bullet_y
@@ -291,8 +291,9 @@ move_bullets:
 	_loop_move_bullets1: 
 	lb t3, bullet_y(s0)
 	sub t3, t3, 1
-	blt t3, 0, _make_into_zero
 	sb t3, bullet_y(s0)
+	blt t3, 0, _make_into_zero
+	#sb t3, bullet_y(s0)
 
 	_inc:
 	inc s0
