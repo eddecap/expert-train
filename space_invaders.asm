@@ -24,14 +24,34 @@ player_image: .byte
  	5   5   5   5   5
  	5   0   2   0   5
 #data for shot(s) remaining
-shots_left: .word 50	
+shots_left: .word 50
 #data for bullets 
 bullet_x: .byte 0:MAX_BULLETS #replaces dot_x1
 bullet_y: .byte 0:MAX_BULLETS #replaces dot_y1
 bullet_active: .byte 0:MAX_BULLETS
 #data for frame counter 
 next_bullet: .word 0
+#enemy
+enemy_x: .word 10
+enemy_y: .word 2
+test_x: .word 32
+test_y: .word 32
+enemy_image: .byte
+	6   0   2   0   6
+ 	6   6   6   6   6
+ 	6   7   7   7   6
+ 	0   6   7   6   0
+ 	0   0   6   0   0
+#end screen
+game_over: .word 0	
+pat_G pat_A pat_M pat_E 
+game_over1: .word 0
+pat_O pat_V pat_E pat_R pat_bang 
 
+#test
+screen_width: .word 64
+screen_height: .word 64
+background_color: .word 0x000000
 
 
 .text
@@ -42,10 +62,12 @@ next_bullet: .word 0
 main:
 	# set up anything you need to here,
 	# and wait for the user to press a key to start.
+	jal draw_beginning_screen
+	# if user presses B enter the main loop
+	jal input_get_keys
+	print_int s3
+	beq s3, KEY_B, _main_loop
 
-	li  v0, 32 
-	syscall
-	
 
 _main_loop:
 	# check for input,
@@ -54,18 +76,22 @@ _main_loop:
 
 	jal check_input
 	jal check_input_bullet
+	#jal move_enemies
 	jal move_bullets
 	jal draw_spaceship
 	jal draw_lives
 	jal draw_shots_left
 	jal draw_bullets
+	jal draw_enemies
 	#what he had:
 	jal	display_update_and_clear
 	jal	wait_for_next_frame
 	b	_main_loop 
 
 _game_over:
+	jal exit_screen
 	exit
+
 
 # --------------------------------------------------------------------------------------------------
 # call once per main loop to keep the game running at 60FPS.
@@ -92,10 +118,39 @@ _wait_next_frame_loop:
 leave	s0
 
 # --------------------------------------------------------------------------------------------------
-
 # .....and here's where all the rest of your code goes :D
 
-check_input: #if  function 	
+draw_beginning_screen: #function
+	push ra
+
+	li a0, 0
+	li a1, 0
+	li a2, 64
+	li a3, 64
+	li v1, 7
+	jal display_fill_rect
+
+
+	pop ra
+	jr ra
+
+exit_screen:	#function
+	push ra
+
+	li a0 30
+	li a1 30
+	lw a2, game_over
+	jal display_draw_text
+
+	li a0 30
+	li a1 40
+	lw a2, game_over1
+	jal display_draw_text
+
+	pop ra
+	jr ra
+
+check_input: #function 	
 	push ra
 	jal input_get_keys
 
@@ -179,10 +234,13 @@ check_input: #if  function
 draw_spaceship: #function
 	push ra
 
+
 	lw a0, dot_x
 	lw a1, dot_y
 	la a2, player_image
 	jal display_blit_5x5
+
+
 
 	pop ra
 	jr ra #end function
@@ -211,67 +269,51 @@ draw_lives: #function
 draw_shots_left: #function
 	push ra
 
-	li a0 1
-	li a1 58
-	li a2 50
+	li a0 1						# a0 = 1
+	li a1 58					# a1 = 58
+	lw a2, shots_left 			#Loads shots_left in a2
+	sub a2, a2, t7				# a2 = a2 - t7 (# of times B is pressed)
+	beq a2, 0, _game_over		# fix this
+	sw a2, shots_left			#stores shots_left in a2		
 	jal display_draw_int 
 
 	pop ra
 	jr ra #end function
 
-check_input_bullet: #function
-
+draw_enemies:
 	push ra
+	push s0
+	push s1
 
-	lw t0, next_bullet
-	lw t1, frame_counter
-	bgt t0, t1, _check_input_bullet_exit #if next_bullet frame > frame counter > don't fire bullet
+	lw t4, enemy_x
+	lw t6, enemy_y
+
+	li s0, 0 			#s0 = 0 counter for inner loop
+	li s1, 0			#s1 = 0 counter for outer loop 
+
 	
-	jal input_get_keys
-	and t1, v0, KEY_B
-	bne t1, KEY_B, _check_input_bullet_exit #not equal to KEY_B
-
-	# we're firing a bullet here, make it
-
-	lw t0 frame_counter
-	addi t0, t0, 20 #add 20, 20 frames from now bgt condition wont be true
-	sw t0, next_bullet
-
-	jal search_unused_slot
-
-	# if we found an unused slot, (if v0 < MAX_BULLETS)
-
-	beq v0, MAX_BULLETS, _check_input_bullet_exit #no active bullets found
-	
-	#	fill in its x and y and active.
-	lw t0, dot_y
-	sub t0, t0, 5
-	sb t0, bullet_y(v0) # bullet_y[v0] = dot_y - 5
-
-	lw t2, dot_x
-	add t2, t2, 2
-	sb t2, bullet_x(v0)
-
-	li t0, 1
-	sb t0, bullet_active(v0)
-
-
-_check_input_bullet_exit:
+		_draw_col: 
+		move a0, t4
+		move a1, t6
+		la a2, enemy_image	#draw enemy	
+		jal display_blit_5x5
+		addi t6, t6, 7 		#increment t1 by 7 > t1 = t1 + 7
+		inc s0
+		blt s0, 4, _draw_col #if s0 < 4 loop again
+	 
+	 addi t4, t4, 10 		#increment by 10 > t0 = t0 + 10	
+	 inc s1					#s1++
+	 blt s1, 5, _update_y	#if s1<5, update y coordinates back to 2:
+	 beq s1, 5, _exit_draw_enemies
+	 _update_y:
+	 add t6, zero, 2		#reset y position to 2
+	 li s0, 0				#reset counter
+	 b _draw_col			#loop _draw_col
+	_exit_draw_enemies: 
+	pop s1
+	pop s0
 	pop ra
-	jr ra #end function
-
-draw_bullets: #function
-	push ra
-	bge v0, MAX_BULLETS, _exit_draw_bullets #no bullets to draw
-	#only active 
-	lbu a0, bullet_x
-	lbu a1, bullet_y
-	li a2, COLOR_WHITE
-	jal display_set_pixel
-
-	_exit_draw_bullets:
-	pop ra
-	jr ra #end function
+	jr ra 
 
 move_bullets:
 	push ra
@@ -282,33 +324,141 @@ move_bullets:
 	#loop bullet_active
 	la t0, bullet_active
 	li s0, 0
-	_loop_move_bullets:
+	_loop_move_bullets:					#sees what is in bullet_active[i] 
 	lb t1, bullet_active(s0)
-	beq t1, 1, _loop_move_bullets1
-	beq t1, 0, _inc
+	beq t1, 1, _loop_move_bullets1		# if 1, move bullet
+	beq t1, 0, _inc 					# if 0, increment 
 
 	_loop_move_bullets1: 
-	lb t3, bullet_y(v0)
+	lb t3, bullet_y(s0)
 	sub t3, t3, 1
-	sb t3, bullet_y(v0)
 	blt t3, 0, _make_into_zero
+	sb t3, bullet_y(s0)
+	#blt t3, 0, _make_into_zero
+	#sb t3, bullet_y(s0)
 
 	_inc:
-	inc s0
-	beq s0, MAX_BULLETS, _exit_move_bullets
-	b _loop_move_bullets
+	inc s0										#i++
+	beq s0, MAX_BULLETS, _exit_move_bullets		# if s0==MAX_BULLETS, exit
+	b _loop_move_bullets 						# Loop again to find bullet_active[i]=1
 
 	#bge t3, 0, _exit_move_bullets
 
 	# here, the bullet has gone off the screen
 	# so, do something??
 	_make_into_zero:
-	sb zero, bullet_active(v0) #store zero
+	#add t3, t3, 1 #?
+	sb zero, bullet_active(s0) #store zero
 	b _inc
-
 
 _exit_move_bullets:
 	pop s0
+	pop ra
+	jr ra #end function
+
+move_enemies: #function
+	push ra
+
+	_move_enemy_right:
+	lw t0, enemy_x					#load enemy_x into t0
+	addi t0, t0, 10					#t0 = t0 + 1
+	#bge t0, 55, _move_enemies_exit	# if t0 >= 60 exit			
+	sw t0, enemy_x
+	#b _move_enemy_right
+
+
+	_move_enemies_exit:
+	pop ra
+	jr ra #end function
+
+check_input_bullet: #function
+
+	push ra
+	push s2
+
+	#li s2, 0 #counter to check if hitting b
+
+	li t7, 0
+
+	lw t0, next_bullet
+	lw t1, frame_counter
+	bgt t0, t1, _check_input_bullet_exit #if next_bullet frame > frame counter > don't fire bullet
+	
+	jal input_get_keys
+	and t1, v0, KEY_B
+	bne t1, KEY_B, _check_input_bullet_exit #not equal to KEY_B
+	#inc t5
+
+	#_inc_B:
+	inc t7		#keeps track how many times b is hit
+
+	#move a0, t7
+	#la a0, frame_counter
+	#li v0, 1
+	#syscall
+	# we're firing a bullet here, make it
+
+	lw t0, frame_counter
+	addi t0, t0, 20 #add 20, 20 frames from now bgt condition wont be true
+	sw t0, next_bullet
+
+	jal search_unused_slot
+
+	beq v0, MAX_BULLETS, _check_input_bullet_exit #no active bullets found
+
+	# if we found an unused slot, (if v0 < MAX_BULLETS)
+
+	#li t0, 1
+	#sb t0, bullet_active(v0)
+
+	
+	#	fill in its x and y and active.
+	lw t0, dot_y
+	sub t0, t0, 5
+	sb t0, bullet_y(v0) # bullet_y[v0] = dot_y - 5
+
+	lw t2, dot_x
+	add t2, t2, 2
+	sb t2, bullet_x(v0)
+
+
+	li t0, 1
+	sb t0, bullet_active(v0)
+
+_check_input_bullet_exit:
+	pop s2
+	pop ra
+	jr ra #end function
+
+draw_bullets: #function
+	push ra
+	push s1
+	
+	la t0, bullet_active
+	li s1, 0
+	#bge v0, MAX_BULLETS, _exit_draw_bullets #no bullets to draw
+	#only active 
+
+	_loop_draw_bullet:
+	lb t1, bullet_active(s1)
+	beq t1, 1, _draw_bullet
+	
+	b _inc_draw
+
+	_draw_bullet: 
+	lbu a0, bullet_x(s1)
+	lbu a1, bullet_y(s1)
+	li a2, COLOR_WHITE
+	jal display_set_pixel
+	
+
+	_inc_draw:
+	inc s1
+	beq s1, MAX_BULLETS, _exit_draw_bullets
+	b _loop_draw_bullet
+
+_exit_draw_bullets:
+	pop s1
 	pop ra
 	jr ra #end function
 
@@ -325,7 +475,7 @@ search_unused_slot: #function
  	blt s0, MAX_BULLETS, _loop_search_slot
  	#b _exit_draw_bullets
 
-	_exit_search_unused_slot:
+_exit_search_unused_slot:
 	move v0, s0  
 
 	pop s0
