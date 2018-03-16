@@ -76,7 +76,7 @@ _main_loop:
 
 	jal check_input
 	jal check_input_bullet
-	#jal move_enemies
+	jal move_enemies
 	jal move_bullets
 	jal draw_spaceship
 	jal draw_lives
@@ -359,10 +359,15 @@ _exit_move_bullets:
 move_enemies: #function
 	push ra
 
+	lw a0, frame_counter			#load frame_counter in a0
+	li t2, 30						# t2 = 30
+	rem t3, a0, t2					# t3 is the remaindr a0/t2 
+	bne t3, 0, _move_enemies_exit	# if t3 == 0, exit
+
 	_move_enemy_right:
 	lw t0, enemy_x					#load enemy_x into t0
-	addi t0, t0, 10					#t0 = t0 + 1
-	#bge t0, 55, _move_enemies_exit	# if t0 >= 60 exit			
+	addi t0, t0, 1					#t0 = t0 + 1
+	bge t0, 17, _move_enemies_exit	# if t0 >= 60 exit			
 	sw t0, enemy_x
 	#b _move_enemy_right
 
