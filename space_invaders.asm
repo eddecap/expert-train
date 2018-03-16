@@ -34,6 +34,7 @@ next_bullet: .word 0
 #enemy
 enemy_x: .word 10
 enemy_y: .word 2
+enemy_left_right: .word 0
 test_x: .word 32
 test_y: .word 32
 enemy_image: .byte
@@ -285,7 +286,7 @@ draw_enemies:
 	push s0
 	push s1
 
-	lw t4, enemy_x
+	lw t5, enemy_x
 	lw t6, enemy_y
 
 	li s0, 0 			#s0 = 0 counter for inner loop
@@ -293,7 +294,7 @@ draw_enemies:
 
 	
 		_draw_col: 
-		move a0, t4
+		move a0, t5
 		move a1, t6
 		la a2, enemy_image	#draw enemy	
 		jal display_blit_5x5
@@ -301,12 +302,12 @@ draw_enemies:
 		inc s0
 		blt s0, 4, _draw_col #if s0 < 4 loop again
 	 
-	 addi t4, t4, 10 		#increment by 10 > t0 = t0 + 10	
+	 addi t5, t5, 10 		#increment by 10 > t0 = t0 + 10	
 	 inc s1					#s1++
 	 blt s1, 5, _update_y	#if s1<5, update y coordinates back to 2:
 	 beq s1, 5, _exit_draw_enemies
 	 _update_y:
-	 add t6, zero, 2		#reset y position to 2
+	 lw t6, enemy_y		#reset y position to 2
 	 li s0, 0				#reset counter
 	 b _draw_col			#loop _draw_col
 	_exit_draw_enemies: 
@@ -360,17 +361,37 @@ move_enemies: #function
 	push ra
 
 	lw a0, frame_counter			#load frame_counter in a0
-	li t2, 30						# t2 = 30
-	rem t3, a0, t2					# t3 is the remaindr a0/t2 
+	li t4, 30						# t2 = 30
+	rem t3, a0, t4					# t3 is the remaindr a0/t2 
 	bne t3, 0, _move_enemies_exit	# if t3 == 0, exit
+
+	lw t1, enemy_left_right
+
+	beq t1, 0, _move_enemy_right
+	beq t1, 1, _move_enemies_left
 
 	_move_enemy_right:
 	lw t0, enemy_x					#load enemy_x into t0
 	addi t0, t0, 1					#t0 = t0 + 1
-	bge t0, 17, _move_enemies_exit	# if t0 >= 60 exit			
+	bge t0, 18, _move_enemies_down	# if t0 >= 60 exit			
 	sw t0, enemy_x
-	#b _move_enemy_right
-
+	b _move_enemies_exit
+	
+	_move_enemies_down:
+	xor t1, t1, 1
+	sw t1, enemy_left_right
+	lw t0, enemy_y
+	addi t0, t0, 1
+	bge t0, 10, _move_enemies_exit
+	sw t0, enemy_y
+	b _move_enemies_exit
+	
+	_move_enemies_left:
+	lw t0, enemy_x
+	sub t0, t0, 1
+	blt t0, 2, _move_enemies_down
+	sw t0, enemy_x
+	b _move_enemies_exit
 
 	_move_enemies_exit:
 	pop ra
@@ -392,7 +413,6 @@ check_input_bullet: #function
 	jal input_get_keys
 	and t1, v0, KEY_B
 	bne t1, KEY_B, _check_input_bullet_exit #not equal to KEY_B
-	#inc t5
 
 	#_inc_B:
 	inc t7		#keeps track how many times b is hit
