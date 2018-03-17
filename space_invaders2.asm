@@ -14,7 +14,7 @@ frame_counter:    .word 0
 # my data 
 #data for rocket ship & lives left image
 dot_x: .word 32
-dot_y: .word 32
+dot_y: .word 50
 dot_x1:.word 32
 dot_y1:.word 32
 player_image: .byte 
@@ -66,10 +66,20 @@ main:
 	# and wait for the user to press a key to start.
 	#jal draw_beginning_screen
 	# if user presses B enter the main loop
+	
+	jal draw_spaceship
+	jal draw_lives
+	jal draw_shots_left
+	jal draw_bullets
+	jal draw_enemies
+	
+	jal	display_update_and_clear
+	jal	wait_for_next_frame
 	jal input_get_keys
-	print_int s3
-	beq s3, KEY_B, _main_loop
-
+	
+	
+	bne v0, 0, _main_loop
+	b main
 
 _main_loop:
 	# check for input,
@@ -79,7 +89,7 @@ _main_loop:
 	jal check_input
 	jal check_input_bullet
 
-	#jal move_enemies
+	jal move_enemies
 	jal move_bullets
 	
 	jal draw_spaceship
