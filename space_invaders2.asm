@@ -288,21 +288,26 @@ draw_enemies: #function
 	push ra
 	push s0
 	push s1
+	push s2
 
 	lw t5, enemy_x
 	lw t6, enemy_y
 
 	li s0, 0 			#s0 = 0 counter for inner loop
 	li s1, 0			#s1 = 0 counter for outer loop 
-
+	li s2, 0			#counter for enemy_alive
 	
 		_draw_col: 
 		move a0, t5
 		move a1, t6
+		lbu t3, enemy_alive(s2)
+		beq t3, 1, _skip_draw
 		la a2, enemy_image	#draw enemy	
 		jal display_blit_5x5
+		_skip_draw:
 		addi t6, t6, 7 		#increment t1 by 7 > t1 = t1 + 7
 		inc s0
+		inc s2
 		blt s0, 4, _draw_col #if s0 < 4 loop again
 	 
 	 addi t5, t5, 10 		#increment by 10 > t0 = t0 + 10	
@@ -314,6 +319,7 @@ draw_enemies: #function
 	 li s0, 0				#reset counter
 	 b _draw_col			#loop _draw_col
 	_exit_draw_enemies: 
+	pop s2
 	pop s1
 	pop s0
 	pop ra
@@ -324,6 +330,7 @@ check_point: #function
 	push s0
 	push s1
 	push s2
+	push s3
 	#check if point is inside 5x5 rectangle 
 
 	lw t0, enemy_x
@@ -332,8 +339,10 @@ check_point: #function
 	li s0, 0 			#s0 = 0 counter for inner loop
 	li s1, 0			#s1 = 0 counter for outer loop 
 	li s2, 0			#s2 = 0 counter for bullet_active
-
+	li s3, 0			#s3 = enemy counter
 		_check_active_bullet:
+		lbu t2, enemy_alive(s3)
+		beq t2, 1, _next_enemy
 		beq s2, MAX_BULLETS, _next_enemy
 
 		lbu t5, bullet_active(s2)
@@ -346,12 +355,16 @@ check_point: #function
 			blt t2, t0, _check_next_active_bullet
 			blt t3, t1, _check_next_active_bullet
 			addi t5, t0, 5
-			addi t6, t1, 5 
+			addi t6, t1, 5
 			bgt t2, t5 _check_next_active_bullet
 			bgt t3, t6 _check_next_active_bullet
-				li a0, 3
-				li v0, 1
-				syscall
+				
+			
+				###COLLISION CONDITIONS
+				li t5, 0
+				sb t5, bullet_active(s2)
+				li t5, 1
+				sb t5, enemy_alive(s3)
 				b _check_next_active_bullet
 
 
@@ -360,10 +373,11 @@ check_point: #function
 			b _check_active_bullet
 
 	_next_enemy:
+	inc s3
 	li s2, 0
-	blt s1, 4, _down_enemy
+	blt s1, 3, _down_enemy
 	li s1, 0
-	blt s0, 5, _right_column
+	blt s0, 4, _right_column
 	b _exit_check_point
 
 		_down_enemy:
@@ -373,6 +387,7 @@ check_point: #function
 
 		_right_column:
 		inc s0
+
 		addi t0, t0, 10 #move to the next _right_column
 		lw t1, enemy_y #reset enemy_y
 		b _check_active_bullet
@@ -380,6 +395,7 @@ check_point: #function
 
 																																						
 	_exit_check_point:
+	pop s3
 	pop s2
 	pop s1
 	pop s0
@@ -581,4 +597,3 @@ _exit_search_unused_slot:
 
 
 #end 
-
