@@ -34,8 +34,10 @@ next_bullet: .word 0
 #enemy
 enemy_x: .word 10
 enemy_y: .word 2
+enemy_left_right: .word 0
 test_x: .word 32
 test_y: .word 32
+enemy_alive: .byte 0:20
 enemy_image: .byte
 	6   0   2   0   6
  	6   6   6   6   6
@@ -62,7 +64,7 @@ background_color: .word 0x000000
 main:
 	# set up anything you need to here,
 	# and wait for the user to press a key to start.
-	jal draw_beginning_screen
+	#jal draw_beginning_screen
 	# if user presses B enter the main loop
 	jal input_get_keys
 	print_int s3
@@ -73,11 +75,13 @@ _main_loop:
 	# check for input,
 	# update everything,
 	# then draw everything.
-
+	jal check_point
 	jal check_input
 	jal check_input_bullet
+
 	#jal move_enemies
 	jal move_bullets
+	
 	jal draw_spaceship
 	jal draw_lives
 	jal draw_shots_left
@@ -273,19 +277,19 @@ draw_shots_left: #function
 	li a1 58					# a1 = 58
 	lw a2, shots_left 			#Loads shots_left in a2
 	sub a2, a2, t7				# a2 = a2 - t7 (# of times B is pressed)
-	beq a2, 0, _game_over		# fix this
+	beq a2, -1, _game_over		# fix this
 	sw a2, shots_left			#stores shots_left in a2		
 	jal display_draw_int 
 
 	pop ra
 	jr ra #end function
 
-draw_enemies:
+draw_enemies: #function 
 	push ra
 	push s0
 	push s1
 
-	lw t4, enemy_x
+	lw t5, enemy_x
 	lw t6, enemy_y
 
 	li s0, 0 			#s0 = 0 counter for inner loop
@@ -293,7 +297,7 @@ draw_enemies:
 
 	
 		_draw_col: 
-		move a0, t4
+		move a0, t5
 		move a1, t6
 		la a2, enemy_image	#draw enemy	
 		jal display_blit_5x5
@@ -301,21 +305,88 @@ draw_enemies:
 		inc s0
 		blt s0, 4, _draw_col #if s0 < 4 loop again
 	 
-	 addi t4, t4, 10 		#increment by 10 > t0 = t0 + 10	
+	 addi t5, t5, 10 		#increment by 10 > t0 = t0 + 10	
 	 inc s1					#s1++
 	 blt s1, 5, _update_y	#if s1<5, update y coordinates back to 2:
 	 beq s1, 5, _exit_draw_enemies
 	 _update_y:
-	 add t6, zero, 2		#reset y position to 2
+	 lw t6, enemy_y		#reset y position to 2
 	 li s0, 0				#reset counter
 	 b _draw_col			#loop _draw_col
 	_exit_draw_enemies: 
 	pop s1
 	pop s0
 	pop ra
-	jr ra 
+	jr ra #end function
 
-move_bullets:
+check_point: #function
+	push ra
+	push s0
+	push s1
+	push s2
+	#check if point is inside 5x5 rectangle 
+
+	lw t0, enemy_x
+	lw t1, enemy_y
+
+	li s0, 0 			#s0 = 0 counter for inner loop
+	li s1, 0			#s1 = 0 counter for outer loop 
+	li s2, 0			#s2 = 0 counter for bullet_active
+
+		_check_active_bullet:
+		beq s2, MAX_BULLETS, _next_enemy
+
+		lbu t5, bullet_active(s2)
+		
+	 	beq t5, 0, _check_next_active_bullet
+		
+		lb t2, bullet_x(s2)
+		lb t3, bullet_y(s2)	
+
+			blt t2, t0, _check_next_active_bullet
+			blt t3, t1, _check_next_active_bullet
+			addi t5, t0, 5
+			addi t6, t1, 5 
+			bgt t2, t5 _check_next_active_bullet
+			bgt t3, t6 _check_next_active_bullet
+				li a0, 3
+				li v0, 1
+				syscall
+				b _check_next_active_bullet
+
+
+			_check_next_active_bullet:
+			inc s2
+			b _check_active_bullet
+
+	_next_enemy:
+	li s2, 0
+	blt s1, 4, _down_enemy
+	li s1, 0
+	blt s0, 5, _right_column
+	b _exit_check_point
+
+		_down_enemy:
+		inc s1
+		addi t1, t1, 7 #move down to the next enemy
+		b _check_active_bullet
+
+		_right_column:
+		inc s0
+		addi t0, t0, 10 #move to the next _right_column
+		lw t1, enemy_y #reset enemy_y
+		b _check_active_bullet
+
+
+																																						
+	_exit_check_point:
+	pop s2
+	pop s1
+	pop s0
+	pop ra 
+	jr ra #end function	
+
+move_bullets: #function 
 	push ra
 	push s0
 	#only active 0 - MAX_BULLETS
@@ -359,13 +430,38 @@ _exit_move_bullets:
 move_enemies: #function
 	push ra
 
+	lw a0, frame_counter			#load frame_counter in a0
+	li t4, 30						# t2 = 30
+	rem t3, a0, t4					# t3 is the remaindr a0/t2 
+	bne t3, 0, _move_enemies_exit	# if t3 == 0, exit
+
+	lw t1, enemy_left_right
+
+	beq t1, 0, _move_enemy_right
+	beq t1, 1, _move_enemies_left
+
 	_move_enemy_right:
 	lw t0, enemy_x					#load enemy_x into t0
-	addi t0, t0, 10					#t0 = t0 + 1
-	#bge t0, 55, _move_enemies_exit	# if t0 >= 60 exit			
+	addi t0, t0, 1					#t0 = t0 + 1
+	bge t0, 18, _move_enemies_down	# if t0 >= 60 exit			
 	sw t0, enemy_x
-	#b _move_enemy_right
-
+	b _move_enemies_exit
+	
+	_move_enemies_down:
+	xor t1, t1, 1
+	sw t1, enemy_left_right
+	lw t0, enemy_y
+	addi t0, t0, 1
+	bge t0, 10, _move_enemies_exit
+	sw t0, enemy_y
+	b _move_enemies_exit
+	
+	_move_enemies_left:
+	lw t0, enemy_x
+	sub t0, t0, 1
+	blt t0, 2, _move_enemies_down
+	sw t0, enemy_x
+	b _move_enemies_exit
 
 	_move_enemies_exit:
 	pop ra
@@ -387,7 +483,6 @@ check_input_bullet: #function
 	jal input_get_keys
 	and t1, v0, KEY_B
 	bne t1, KEY_B, _check_input_bullet_exit #not equal to KEY_B
-	#inc t5
 
 	#_inc_B:
 	inc t7		#keeps track how many times b is hit
@@ -424,6 +519,8 @@ check_input_bullet: #function
 
 	li t0, 1
 	sb t0, bullet_active(v0)
+
+
 
 _check_input_bullet_exit:
 	pop s2
@@ -481,6 +578,7 @@ _exit_search_unused_slot:
 	pop s0
 	pop ra
 	jr ra #end function
+
 
 #end 
 
